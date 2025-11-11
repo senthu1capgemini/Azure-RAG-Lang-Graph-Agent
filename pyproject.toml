@@ -1,0 +1,18 @@
+[project]
+name = "agentdemo"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "azure-core>=1.36.0",
+    "azure-identity>=1.25.1",
+    "azure-search-documents>=11.6.0",
+    "langchain>=1.0.5",
+    "langchain-community>=0.4.1",
+    "langchain-openai>=1.0.2",
+    "langchain-text-splitters>=1.0.0",
+    "langgraph>=1.0.2",
+    "psycopg>=3.2.12",
+    "python-dotenv>=1.2.1",
+]

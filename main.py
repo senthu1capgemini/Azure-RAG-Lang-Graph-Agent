@@ -26,23 +26,6 @@ from azure.search.documents.models import VectorizedQuery
 load_dotenv()
 SQLITE_DB_PATH ="chat_history.db"
 
-# conn = sqlite3.connect("chat_history.db")
-# cursor = conn.cursor()
-
-# # Create the table if it doesn't exist
-# cursor.execute("""
-#     CREATE TABLE IF NOT EXISTS chat_messages (
-#         session_id TEXT,
-#         role TEXT,
-#         content TEXT
-#     )
-# """)
-
-# conn.commit()
-# conn.close()
-
-
-
 #Azure Components Initialization - LLM, Embeddings, Vector Store, Memory----------------------------------------------------------------------
 # Initialize Azure OpenAI LLM
 llm = AzureChatOpenAI(
@@ -147,11 +130,13 @@ vector_store = AzureSearchVector(
 )
 
 # SQLite-based chat history management-----------------------------------------------------------------------------------------------------------------
+chat_histories = {}
+
 def get_session_history(session_id: str) -> SQLChatMessageHistory:
-    """Get or create SQLite-backed chat history for a session."""
+    """Get SQLite-backed chat history for a session."""
     return SQLChatMessageHistory(
         session_id=session_id,
-        connection_string=f"sqlite:///{SQLITE_DB_PATH}"
+        connection=f"sqlite:///{SQLITE_DB_PATH}"
     )
 
 def clear_session_history(session_id: str = None):
@@ -161,7 +146,7 @@ def clear_session_history(session_id: str = None):
         cursor = conn.cursor() # Needed to execute the SQL commands
         if session_id:
             # Clear specific session
-            cursor.execute("Delete from message_store where session_id: ", (session_id,))
+            cursor.execute("Delete from message_store WHERE session_id = ? ", (session_id,))
             rows_deleted = cursor.rowcount
             conn.commit()
             conn.close()
@@ -206,44 +191,6 @@ def list_sessions():
         return result
     except Exception as e:
         return f"Error listing sessions: {str(e)}"
-
-# Dictionary to store chat histories by session_id-----------------------------------------------------------------------------------------------------------------
-chat_histories = {}
-
-def get_session_history(session_id: str) -> InMemoryChatMessageHistory:
-    """Get or create chat history for a session."""
-    if session_id not in chat_histories:
-        chat_histories[session_id] = InMemoryChatMessageHistory()
-    return chat_histories[session_id]
-
-def clear_session_history(session_id: str = None):
-    """Clear chat history for a specific session or all sessions."""
-    if session_id:
-        if session_id in chat_histories:
-            chat_histories[session_id].clear()
-            return f"Cleared history for session: {session_id}"
-        return f"No history found for session: {session_id}"
-    else:
-        chat_histories.clear()
-        return "Cleared all chat histories"
-    
-def list_sessions():
-    """List all available sessions."""
-    conn = sqlite3.connect("chat_history.db")
-    cursor = conn.cursor()
-
-    # Query all rows from the chat_messages table
-    cursor.execute("SELECT session_id, role, content FROM chat_messages")
-    rows = cursor.fetchall()
-
-    # Print each row
-    for row in rows:
-        session_id, role, content = row
-        print(f"[{session_id}] {role}: {content}")
-
-    # Close the connection
-    conn.close()
-
 
 #  Define Tools - Mathematical Calculation, Text Summarization, Knowledge Base Search------------------------------------------------------------------------------
 @tool
@@ -330,39 +277,30 @@ workflow.add_node("tools", tool_node)  # Single ToolNode handles all tools
 
 # Set entry point
 workflow.set_entry_point("agent")
-workflow.add_conditional_edges(
-    "agent",
-    should_continue,
-    {
-        "tools": "tools",
-        "end": END
+workflow.add_conditional_edges("agent", should_continue,
+    { 
+      "tools": "tools",
+      "end": END
     }
 )
 workflow.add_edge("tools", "agent")
 
 # Compile the graph
 app = workflow.compile()
-
 # Main execution function of agent with memory------------------------------------------------------------------------------------------------------
-def run_agent(user_input: str, session_id: str = "default"):
-    
+def run_agent(user_input: str, session_id: str = "defaultUser"):
     # Get conversation history
     chat_history = get_session_history(session_id)
-    
     # Load previous messages
     previous_messages = chat_history.messages
-    
     # Create initial state
     initial_state = {
         "messages": previous_messages + [HumanMessage(content=user_input)]
     }
-    
     # Run the workflow
     result = app.invoke(initial_state)
-    
     # Save to memory
     chat_history.add_user_message(user_input)
-    
     # Get the final AI message
     final_message = result["messages"][-1]
     if hasattr(final_message, 'content'):
@@ -383,14 +321,13 @@ def interactive_cli():
     print("\nCommands:")
     print("  - Type your query and press Enter to talk to the agent")
     print("  - 'status' - Show agent status")
-    print(f"\n📁 Database: {SQLITE_DB_PATH}")
     print("  - 'clear' - Clear current session history")
     print("  - 'sessions' - List all available sessions")
     print("  - 'session <name>' - Switch to a different session")
     print("\nAvailable Tools:")
     print("  - calculate(expression) - Perform math calculations")
     print("  - summarize_text(text) - Summarize long text")
-    print("  - search_knowledge_base(query) - Search the knowledge base")
+    print("  - search knowledge base(query) - Search the knowledge base")
     print("  - web search(query) - Search the web via Tavily")
     print("\n" + "="*70 + "\n")
 
@@ -406,21 +343,17 @@ def interactive_cli():
             
             # Handle empty input
             if not user_input:
-                continue
-            
+                continue    
             # Handle commands
             if user_input.lower() in ['quit', 'exit', 'q']:
-                print("\n Goodbye!\n")
-                break
-            
+                print("\n Goodbye! Your are on your own now!\n")
+                break          
             elif user_input.lower() == 'clear':
                 if clear_session_history(current_session):
                     print(f"\n Cleared history for session '{current_session}'\n")
                 else:
                     print(f"\n No history to clear for session '{current_session}'\n")
-                continue
-            
-            
+                continue          
             elif user_input.lower().startswith('session '):
                 new_session = user_input.split(' ', 1)[1].strip()
                 if new_session:
@@ -429,15 +362,9 @@ def interactive_cli():
                 else:
                     print("\n Please provide a session name\n")
                 continue
-
-            elif user_input.lower() == 'clear':
-                result = clear_session_history(current_session)
-                print(f"\nCleared session {result}\n")
-                continue
-            elif user_input.lower() == 'session_history':
+            elif user_input.lower() == 'sessions':
                 result = get_session_history()
                 continue
-            
             
             # Run the agent
             print(f"\n[{current_session}] Agent: ", end="", flush=True)
@@ -445,7 +372,7 @@ def interactive_cli():
             print(response)
         
         except KeyboardInterrupt:
-            print("\n\n Interrupted. Goodbye!\n")
+            print("\n\n Interrupted. Goodbye! Stupid of me or beyond my control!\n")
             break
         
         except Exception as e:

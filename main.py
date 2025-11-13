@@ -1,6 +1,9 @@
 import os
 import operator
-from dotenv import load_dotenv
+import psycopg2
+import sqlite3
+from dotenv import load_dotenv        
+from tavily import TavilyClient
 
 from typing import TypedDict, Annotated, Sequence
 from typing_extensions import TypedDict
@@ -11,6 +14,7 @@ from langchain_core.documents import Document
 from langchain_core.tools import tool
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.chat_history import InMemoryChatMessageHistory
+from langchain_community.chat_message_histories import SQLChatMessageHistory
 
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
@@ -20,40 +24,27 @@ from azure.core.credentials import AzureKeyCredential
 from azure.search.documents.models import VectorizedQuery
 
 load_dotenv()
-
-# Environment variables setup
-AZURE_OPENAI_ENDPOINT = AZURE_OPENAI_ENDPOINT
-AZURE_OPENAI_API_KEY = AZURE_OPENAI_API_KEY
-AZURE_OPENAI_DEPLOYMENT = AZURE_OPENAI_DEPLOYMENT
-AZURE_OPENAI_API_VERSION = AZURE_OPENAI_API_VERSION
-AZURE_EMBEDDINGS_ENDPOINT = AZURE_EMBEDDINGS_ENDPOINT
-AZURE_EMBEDDINGS_API_KEY = AZURE_EMBEDDINGS_API_KEY
-AZURE_EMBEDDINGS_DEPLOYMENT = AZURE_EMBEDDINGS_DEPLOYMENT
-AZURE_EMBEDDINGS_API_VERSION = AZURE_EMBEDDINGS_API_VERSION
-AZURE_SEARCH_INDEX_NAME = AZURE_SEARCH_INDEX_NAME
-AZURE_SEARCH_ENDPOINT = AZURE_SEARCH_ENDPOINT
-AZURE_SEARCH_KEY = AZURE_SEARCH_KEY
-
+SQLITE_DB_PATH ="chat_history.db"
 
 #Azure Components Initialization - LLM, Embeddings, Vector Store, Memory----------------------------------------------------------------------
 # Initialize Azure OpenAI LLM
 llm = AzureChatOpenAI(
-    azure_endpoint=AZURE_OPENAI_ENDPOINT,
-    api_key=AZURE_OPENAI_API_KEY,
-    azure_deployment=AZURE_OPENAI_DEPLOYMENT,
-    api_version = AZURE_OPENAI_API_VERSION,
-    temperature=0.7
+    azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_key = os.getenv("AZURE_OPENAI_API_KEY"),
+    azure_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT"),
+    api_version = os.getenv("AZURE_OPENAI_API_VERSION"),
+    temperature = 0.7
 )
 
 # Initialize Azure OpenAI Embeddings
 embeddings = AzureOpenAIEmbeddings(
-    azure_endpoint = AZURE_EMBEDDINGS_ENDPOINT,
-    api_key = AZURE_EMBEDDINGS_API_KEY ,
-    azure_deployment = AZURE_EMBEDDINGS_DEPLOYMENT,
-    api_version = AZURE_EMBEDDINGS_API_VERSION
+    azure_endpoint = os.getenv("AZURE_EMBEDDINGS_ENDPOINT"),
+    api_key = os.getenv("AZURE_EMBEDDINGS_API_KEY"),
+    azure_deployment = os.getenv("AZURE_EMBEDDINGS_DEPLOYMENT"),
+    api_version = os.getenv("AZURE_EMBEDDINGS_API_VERSION")
 )
 
-# Simple Azure Search wrapper that works directly with Azure SDK----------------------------------------------------------------------
+# Simple Azure Search wrapper that works directly with Azure SDK------------------------------------------------------------------------------------
 class AzureSearchVector:
     def __init__(self, endpoint, key, index_name, embeddings, vector_field="contentVector", text_field="content"):
         # Clean endpoint
@@ -67,7 +58,7 @@ class AzureSearchVector:
             self.client = SearchClient(
                 endpoint=endpoint,
                 index_name=index_name,
-                credential=credential  # Pass the credential object, not the string
+                credential=credential  
             )
             self.embeddings = embeddings
             self.vector_field = vector_field
@@ -77,21 +68,21 @@ class AzureSearchVector:
             print(f"  Testing connection...")
             # Try to get document count
             results = self.client.search(search_text="*", top=1, include_total_count=True)
-            print(f"✓ Connected successfully to Azure Search")
+            print(f"Connected successfully to Azure Search")
             
         except Exception as e:
-            print(f"✗ Failed to initialize Azure Search client")
-            print(f"  Error type: {type(e).__name__}")
-            print(f"  Error message: {e}")
+            print(f"Failed to initialize Azure Search client")
+            print(f"Error type: {type(e).__name__}")
+            print(f"Error message: {e}")
             raise
     
     def similarity_search(self, query: str, k: int = 3):
         try:
-            print(f"\nPerforming similarity search for: '{query}'")
+            print(f"Performing similarity search for: '{query}'")
             
             # Generate embedding
             query_vector = self.embeddings.embed_query(query)
-            print(f"  Generated embedding vector of length: {len(query_vector)}")
+            print(f"Generated embedding vector of length: {len(query_vector)}")
             
             # Create vector query
             vector_query = VectorizedQuery(
@@ -100,8 +91,8 @@ class AzureSearchVector:
                 fields=self.vector_field
             )
             
-            print(f"  Searching in field: {self.vector_field}")
-            print(f"  Returning field: {self.text_field}")
+            print(f"Searching in field: {self.vector_field}")
+            print(f"Returning field: {self.text_field}")
             
             # Search
             results = self.client.search(
@@ -116,49 +107,92 @@ class AzureSearchVector:
             for i, result in enumerate(results):
                 content = result.get(self.text_field, "")
                 if content:
-                    print(f"  Result {i+1}: {content[:100]}...")
+                    print(f" Result {i+1}: {content[:100]}...")
                     docs.append(Document(page_content=content))
             
-            print(f"✓ Found {len(docs)} results")
+            print(f"Found {len(docs)} results")
             return docs
             
         except Exception as e:
-            print(f"✗ Search error: {type(e).__name__}: {e}")
+            print(f"Search error: {type(e).__name__}: {e}")
             import traceback
             traceback.print_exc()
             return []
         
-# # Initialize vector store
+# Initialize vector store
 vector_store = AzureSearchVector(
-    index_name = AZURE_SEARCH_INDEX_NAME,
-    endpoint = AZURE_SEARCH_ENDPOINT,
-    key = AZURE_SEARCH_KEY,
+    index_name = os.getenv("AZURE_SEARCH_INDEX_NAME"),
+    endpoint = os.getenv("AZURE_SEARCH_ENDPOINT"),
+    key = os.getenv("AZURE_SEARCH_KEY"),
     embeddings=embeddings,
     vector_field="text_vector",
     text_field="chunk",  
 )
 
-# Dictionary to store chat histories by session_id
+# SQLite-based chat history management-----------------------------------------------------------------------------------------------------------------
 chat_histories = {}
 
-def get_session_history(session_id: str) -> InMemoryChatMessageHistory:
-    """Get or create chat history for a session."""
-    if session_id not in chat_histories:
-        chat_histories[session_id] = InMemoryChatMessageHistory()
-    return chat_histories[session_id]
+def get_session_history(session_id: str) -> SQLChatMessageHistory:
+    """Get SQLite-backed chat history for a session."""
+    return SQLChatMessageHistory(
+        session_id=session_id,
+        connection=f"sqlite:///{SQLITE_DB_PATH}"
+    )
 
 def clear_session_history(session_id: str = None):
     """Clear chat history for a specific session or all sessions."""
-    if session_id:
-        if session_id in chat_histories:
-            chat_histories[session_id].clear()
-            return f"Cleared history for session: {session_id}"
-        return f"No history found for session: {session_id}"
-    else:
-        chat_histories.clear()
-        return "Cleared all chat histories"
+    try:
+        conn = sqlite3.connect(SQLITE_DB_PATH)
+        cursor = conn.cursor() # Needed to execute the SQL commands
+        if session_id:
+            # Clear specific session
+            cursor.execute("Delete from message_store WHERE session_id = ? ", (session_id,))
+            rows_deleted = cursor.rowcount
+            conn.commit()
+            conn.close()
+            
+            if rows_deleted > 0:
+                return f"Cleared {rows_deleted} messages for session: {session_id}"
+            return f"No history for session: {session_id}"
+        else:
+            # Clear all sessions
+            cursor.execute("Delete from message_store")
+            rows_deleted = cursor.rowcount
+            conn.commit()
+            conn.close()
+            return f"Cleared all chat histories ({rows_deleted} messages)"
+    except Exception as e:
+        return f"Error clearing history: {str(e)}"
 
-#  Define Tools using @tool decorator (recommended modern approach)
+def list_sessions():
+    """List all available sessions in the database."""
+    try:
+        conn = sqlite3.connect(SQLITE_DB_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT session_id, COUNT(*) as message_count, 
+                   MIN(id) as first_message_id, MAX(id) as last_message_id
+            FROM message_store 
+            GROUP BY session_id 
+            ORDER BY last_message_id DESC
+        """)
+        
+        sessions = cursor.fetchall()
+        conn.close()
+        
+        if not sessions:
+            return "No sessions found in database."
+        
+        result = "\nAvailable sessions:\n" + "="*50 + "\n"
+        for session_id, count, first_id, last_id in sessions:
+            result += f"  - {session_id}: {count} messages\n"
+        
+        return result
+    except Exception as e:
+        return f"Error listing sessions: {str(e)}"
+
+#  Define Tools - Mathematical Calculation, Text Summarization, Knowledge Base Search------------------------------------------------------------------------------
 @tool
 def calculate(expression: str) -> str:
     """Performs mathematical calculations. Input should be a valid Python math expression."""
@@ -185,13 +219,31 @@ def search_knowledge_base(query: str) -> str:
     context = "\n\n".join([doc.page_content for doc in results])
     return f"Found relevant information:\n{context}"
 
+@tool
+def web_search(query: str,  num_results: int = 3) -> str:
+    """Searches the web using tavily search and provides upto 5 results."""
+    try:
+        api_key = os.getenv("TAVILY_API_KEY")
+        tavily_client = TavilyClient(api_key)
+        client = TavilyClient("tvly-dev-********************************")
+        response = tavily_client.search(
+                query=query,
+                max_results=3,
+                search_depth="basic"  # or "advanced" for more thorough search
+            )
+        print(response)
+        return response['results']
+    except ValueError as e:
+        print(f"{e}")
+
+
 # Create tools list
-tools = [calculate, summarize_text, search_knowledge_base]
+tools = [calculate, summarize_text, search_knowledge_base, web_search]
 
 # Create ToolNode - this replaces ToolExecutor and individual tool nodes
 tool_node = ToolNode(tools)
 
-# LangGraph State Definition
+# LangGraph State Definition--------------------------------------------------------------------------------------------------------------------------------------
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], operator.add]
 
@@ -220,50 +272,35 @@ def should_continue(state: AgentState):
 
 # Build LangGraph workflow
 workflow = StateGraph(AgentState)
-
-# Add nodes - only need agent and tools now
 workflow.add_node("agent", call_model)
 workflow.add_node("tools", tool_node)  # Single ToolNode handles all tools
 
 # Set entry point
 workflow.set_entry_point("agent")
-
-# Add conditional routing from agent
-workflow.add_conditional_edges(
-    "agent",
-    should_continue,
-    {
-        "tools": "tools",
-        "end": END
+workflow.add_conditional_edges("agent", should_continue,
+    { 
+      "tools": "tools",
+      "end": END
     }
 )
-
-# Tool node automatically returns to agent
 workflow.add_edge("tools", "agent")
 
 # Compile the graph
 app = workflow.compile()
-
-# Main execution function
-def run_agent(user_input: str, session_id: str = "default"):
-    
+# Main execution function of agent with memory------------------------------------------------------------------------------------------------------
+def run_agent(user_input: str, session_id: str = "defaultUser"):
     # Get conversation history
     chat_history = get_session_history(session_id)
-    
     # Load previous messages
     previous_messages = chat_history.messages
-    
     # Create initial state
     initial_state = {
         "messages": previous_messages + [HumanMessage(content=user_input)]
     }
-    
     # Run the workflow
     result = app.invoke(initial_state)
-    
     # Save to memory
     chat_history.add_user_message(user_input)
-    
     # Get the final AI message
     final_message = result["messages"][-1]
     if hasattr(final_message, 'content'):
@@ -272,21 +309,75 @@ def run_agent(user_input: str, session_id: str = "default"):
     
     return str(final_message)
 
+# ====================================================================================================================================================================================================
+# INTERACTIVE CLI INTERFACE
+# ====================================================================================================================================================================================================
+
+def interactive_cli():
+    """Main interactive CLI loop."""
+    print("\n" + "="*70)
+    print("   INTERACTIVE AGENT CLI")
+    print("="*70)
+    print("\nCommands:")
+    print("  - Type your query and press Enter to talk to the agent")
+    print("  - 'status' - Show agent status")
+    print("  - 'clear' - Clear current session history")
+    print("  - 'sessions' - List all available sessions")
+    print("  - 'session <name>' - Switch to a different session")
+    print("\nAvailable Tools:")
+    print("  - calculate(expression) - Perform math calculations")
+    print("  - summarize_text(text) - Summarize long text")
+    print("  - search knowledge base(query) - Search the knowledge base")
+    print("  - web search(query) - Search the web via Tavily")
+    print("\n" + "="*70 + "\n")
+
+    print("Enter your username to start:")
+    username = input(f"").strip()
+    current_session = username
+    print(f"Starting session: {current_session}")
+
+    while True:
+        try:
+            # Get user input
+            user_input = input(f"\n[{current_session}] You: ").strip()
+            
+            # Handle empty input
+            if not user_input:
+                continue    
+            # Handle commands
+            if user_input.lower() in ['quit', 'exit', 'q']:
+                print("\n Goodbye! Your are on your own now!\n")
+                break          
+            elif user_input.lower() == 'clear':
+                if clear_session_history(current_session):
+                    print(f"\n Cleared history for session '{current_session}'\n")
+                else:
+                    print(f"\n No history to clear for session '{current_session}'\n")
+                continue          
+            elif user_input.lower().startswith('session '):
+                new_session = user_input.split(' ', 1)[1].strip()
+                if new_session:
+                    current_session = new_session
+                    print(f"\n Switched to session: {current_session}\n")
+                else:
+                    print("\n Please provide a session name\n")
+                continue
+            elif user_input.lower() == 'sessions':
+                result = get_session_history()
+                continue
+            
+            # Run the agent
+            print(f"\n[{current_session}] Agent: ", end="", flush=True)
+            response = run_agent(user_input, session_id=current_session)
+            print(response)
+        
+        except KeyboardInterrupt:
+            print("\n\n Interrupted. Goodbye! Stupid of me or beyond my control!\n")
+            break
+        
+        except Exception as e:
+            print(f"\n Error: {e}\n")
 
 if __name__ == "__main__":
+    interactive_cli()
 
-    # Run the agent
-    print("\n--- Running Agent ---")
-    response = run_agent("What is 15 * 3?", session_id="userSenthu")
-    print(f"Agent: {response}")
-    
-    print("\n--- Running Agent with Knowledge Base ---")
-    response = run_agent("Can you tell me about the AI healthcare trends as per CSIRO? Please use Knowledge base.", session_id="userSenthu")
-    print(f"Agent: {response}")
-    
-    print("\n--- Running Agent with Summarization ---")
-    long_text = """Expand and diversify retraining pathways: Enhance VET and short-course offerings to quickly adapt to changing skills demands across AI jobs and ensure they remain industry-relevant. This should include expanding existing offerings that have proven effective, co-designing new pathways or offerings with industry, embedding industry credentials / training where appropriate, and implementing Modern Digital Apprenticeship programs at federal and state levels. Diversifying pathways is particularly important for people retraining mid career into areas with greater expected shortages and larger skills changes such as Engineering and will be instrumental in improving diversity in the tech workforce.
-    Promote awareness of AI jobs and skills needs: While it is essential to understand and address the potential impacts of AI on current occupations, we need to have an equal focus on ensuring domestic supply of AI-skilled workers meets demand in the economy to avoid future labour market shortages. This requires us to enhance awareness of the job opportunities AI creates and support Australians to understand training and career pathways. Promote AI literacy across the workforce: Support widespread training initiatives to boost AI literacy across the workforce, ensuring that the workforce is prepared for a future where AI adoption is widespread. This needs to include action to upskill senior management in AI governance and adoption.
-    """
-    response = run_agent(f"Summarize this: {long_text}", session_id="userSenthu")
-    print(f"Agent: {response}")

@@ -147,13 +147,9 @@ def interactive_cli():
 
     while True:
         try:
-            # Get user input
             user_input = input(f"\n[{current_session}] You: ").strip()
-            
-            # Handle empty input
             if not user_input:
                 continue    
-            # Handle commands
             if user_input.lower() in ['quit', 'exit', 'q']:
                 print("\n Goodbye! Your are on your own now!\n")
                 break          
@@ -183,7 +179,6 @@ def interactive_cli():
         except KeyboardInterrupt:
             print("\n\n Interrupted. Goodbye! Stupid of me or beyond my control!\n")
             break
-        
         except Exception as e:
             print(f"\n Error: {e}\n")
 

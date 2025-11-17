@@ -17,7 +17,6 @@ from memory import get_session_history, clear_session_history, list_sessions
 from toolkit import calculate, summarize_text, search_knowledge_base, web_search
 from ragSearch import AzureSearchVector
 
-
 load_dotenv()
 SQLITE_DB_PATH ="chat_history.db"
 
@@ -40,7 +39,6 @@ embeddings = AzureOpenAIEmbeddings(
 )
 
 # Simple Azure Search wrapper that works directly with Azure SDK------------------------------------------------------------------------------------
-        
 # Initialize vector store
 vector_store = AzureSearchVector(
     index_name = os.getenv("AZURE_SEARCH_INDEX_NAME"),
@@ -64,35 +62,31 @@ tool_node = ToolNode(tools)
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], operator.add]
 
-# Define LangGraph workflow nodes
+#define LangGraph workflow nodes
 def call_model(state: AgentState):
     "Calls the LLM to decide what to do next."
-    messages = state["messages"]
-    
-    # Bind tools to LLM
+    messages = state["messages"] 
+    #Bind tools to LLM
     llm_with_tools = llm.bind_tools(tools)
-    
-    # Get response
+    #get response
     response = llm_with_tools.invoke(messages)
     return {"messages": [response]}
-
-# Simplified routing logic
+#routing logic
 def should_continue(state: AgentState):
     "Determines if we should continue to tools or end."
     last_message = state["messages"][-1]
-    
-    # Check if the LLM made a tool call
+    #LLM made a tool call check
     if hasattr(last_message, "tool_calls") and last_message.tool_calls:
         return "tools"
     
     return "end"
 
-# Build LangGraph workflow
+#Build LangGraph workflow
 workflow = StateGraph(AgentState)
 workflow.add_node("agent", call_model)
-workflow.add_node("tools", tool_node)  # Single ToolNode handles all tools
+workflow.add_node("tools", tool_node)  #Single ToolNode handles all tools for this example
 
-# Set entry point
+#Set start point
 workflow.set_entry_point("agent")
 workflow.add_conditional_edges("agent", should_continue,
     { 
@@ -101,9 +95,8 @@ workflow.add_conditional_edges("agent", should_continue,
     }
 )
 workflow.add_edge("tools", "agent")
+app = workflow.compile() # Compile the graph for execution of workflow
 
-# Compile the graph
-app = workflow.compile()
 # Main execution function of agent with memory------------------------------------------------------------------------------------------------------
 def run_agent(user_input: str, session_id: str = "defaultUser"):
     # Get conversation history
@@ -126,10 +119,9 @@ def run_agent(user_input: str, session_id: str = "defaultUser"):
     
     return str(final_message)
 
-# ====================================================================================================================================================================================================
-# INTERACTIVE CLI INTERFACE
-# ====================================================================================================================================================================================================
-
+# ========================================================================================================================================================
+# INTERACTIVE CLI UI
+# ========================================================================================================================================================
 def interactive_cli():
     "Main interactive CLI loop."
     print("\n" + "="*100)

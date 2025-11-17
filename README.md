@@ -32,3 +32,4 @@ To view the database file .db, please use https://inloop.github.io/sqlite-viewer
 - Improved prompting - I did not find this necessary as it really depends on data qualtiy as well.
 - Include a means to login via Entra ID for Azure Logic Apps (Last step)
 
+

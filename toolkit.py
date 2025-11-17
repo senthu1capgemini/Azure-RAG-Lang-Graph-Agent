@@ -22,10 +22,7 @@ embeddings = AzureOpenAIEmbeddings(
     api_key = os.getenv("AZURE_EMBEDDINGS_API_KEY"),
     azure_deployment = os.getenv("AZURE_EMBEDDINGS_DEPLOYMENT"),
     api_version = os.getenv("AZURE_EMBEDDINGS_API_VERSION")
-)
-
-# Simple Azure Search wrapper that works directly with Azure SDK------------------------------------------------------------------------------------
-        
+)      
 # Initialize vector store
 vector_store = AzureSearchVector(
     index_name = os.getenv("AZURE_SEARCH_INDEX_NAME"),
@@ -36,7 +33,7 @@ vector_store = AzureSearchVector(
     text_field="chunk",  
 )
 
-#  Define Tools - Mathematical Calculation, Text Summarization, Knowledge Base Search------------------------------------------------------------------------------
+#  Define Tools - Mathematical Calculation, Text Summarization, Knowledge Base Search, Web Search------------------------------------------------------------------------------
 @tool
 def calculate(expression: str) -> str:
     "Performs mathematical calculations. Input should be a valid Python math expression."
@@ -79,3 +76,4 @@ def web_search(query: str,  num_results: int = 3) -> str:
         return response['results']
     except ValueError as e:
         print(f"{e}")
+

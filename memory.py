@@ -5,7 +5,7 @@ from langchain_community.chat_message_histories import SQLChatMessageHistory
 SQLITE_DB_PATH ="chat_history.db"
 
 def get_session_history(session_id: str) -> SQLChatMessageHistory:
-    "Get SQLite-backed chat history for a session."
+    "Get SQLite chat history for a session."
     return SQLChatMessageHistory(
         session_id=session_id,
         connection=f"sqlite:///{SQLITE_DB_PATH}"
@@ -17,7 +17,7 @@ def clear_session_history(session_id: str = None):
         conn = sqlite3.connect(SQLITE_DB_PATH)
         cursor = conn.cursor() # Needed to execute the SQL commands
         if session_id:
-            # Clear specific session
+            # Clear the session
             cursor.execute("Delete from message_store WHERE session_id = ? ", (session_id,))
             rows_deleted = cursor.rowcount
             conn.commit()
@@ -55,11 +55,10 @@ def list_sessions():
         
         if not sessions:
             return "No sessions found in database."
-        
         result = "\nAvailable sessions:\n" + "="*50 + "\n"
         for session_id, count, first_id, last_id in sessions:
             result += f"  - {session_id}: {count} messages\n"
-        
         return result
+        
     except Exception as e:
         return f"Error listing sessions: {str(e)}"

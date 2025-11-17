@@ -1,4 +1,4 @@
-##Introduction
+# Introduction
 
 - This repository provides a template to create a simple Azure Langchain Langgraph agent workflow that is capable of performing RAG search, web search, summarization, and calculation.
 - This repository was created via uv and all dependancies can be found on the pyproject.toml file.
@@ -38,6 +38,7 @@ To view the database file .db, please use https://inloop.github.io/sqlite-viewer
 - Deploy on Azure Logic Apps for fault tolerance and availability on cloud
 - Improved prompting - I did not find this necessary as it really depends on data qualtiy as well.
 - Include a means to login via Entra ID for Azure Logic Apps (Last step)
+
 
 
 

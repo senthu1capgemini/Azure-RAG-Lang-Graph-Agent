@@ -19,5 +19,11 @@ Additional Guardrails -> Can be implemented via Azure Foundry on model deploymen
 - After tool use → return to "agent" for further reasoning.
 - If no further action is needed → end the workflow
 
-
 To view the database file .db, please use https://inloop.github.io/sqlite-viewer/.
+
+**Next Steps:**
+- If necessary, change SQLITE to Azure CosmosDB
+- Include monitoring via LangFuse, LangSmith
+- Include guardrail implementation via Azure Foundry (This might include PII, toxicitiy, adulterated content, deepfakes, etc.)
+- Continue model experimentation for LLMs and embeddings
+- Continue improvied indexing via skillsets, indexers, indexes on Azure Search 

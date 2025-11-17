@@ -66,7 +66,7 @@ class AgentState(TypedDict):
 
 # Define LangGraph workflow nodes
 def call_model(state: AgentState):
-    """Calls the LLM to decide what to do next."""
+    "Calls the LLM to decide what to do next."
     messages = state["messages"]
     
     # Bind tools to LLM

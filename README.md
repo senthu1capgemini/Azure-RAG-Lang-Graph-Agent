@@ -19,3 +19,5 @@ Additional Guardrails -> Can be implemented via Azure Foundry on model deploymen
 - After tool use → return to "agent" for further reasoning.
 - If no further action is needed → end the workflow
 
+
+To view the database file .db, please use https://inloop.github.io/sqlite-viewer/.

@@ -1,7 +1,6 @@
 **Introduction**
 
 - This repository provides a template to create a simple Azure Langchain Langgraph agent workflow that is capable of performing RAG search, web search, summarization, and calculation.
-
 - This repository was created via uv and all dependancies can be found on the pyproject.toml file.
 
 **Components**
@@ -19,7 +18,14 @@ Additional Guardrails -> Can be implemented via Azure Foundry on model deploymen
 - After tool use → return to "agent" for further reasoning.
 - If no further action is needed → end the workflow
 
+
+# How to use##
+- Create the Azure components : Azure Search, Azure Foundry Emdeddings, and LLM via Forundry. Get the API details and seave as an env file.
+- Run the main.py file
+  
+For Web Search, I use Tavily, you may need to set up an API access for it.
 To view the database file .db, please use https://inloop.github.io/sqlite-viewer/.
+
 
 **Next Steps:**
 - If necessary, change SQLITE to Azure CosmosDB
@@ -31,5 +37,6 @@ To view the database file .db, please use https://inloop.github.io/sqlite-viewer
 - Deploy on Azure Logic Apps for fault tolerance and availability on cloud
 - Improved prompting - I did not find this necessary as it really depends on data qualtiy as well.
 - Include a means to login via Entra ID for Azure Logic Apps (Last step)
+
 
 

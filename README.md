@@ -18,6 +18,12 @@ Additional Guardrails -> Can be implemented via Azure Foundry on model deploymen
 - After tool use → return to "agent" for further reasoning.
 - If no further action is needed → end the workflow
 
+# Python Files
+There are four files used here.
+- main.py : This is the main execution file
+- memory.py : This handles all fucntions related to persistent memory via SQLite
+- toolkit.py : This handles all tool creation.
+- ragSearch.py : This handles the vector database and search functions for Azure Search.
 
 # How to use
 - Create the Azure components : Azure Search, Azure Foundry Emdeddings, and LLM via Forundry. Get the API details and save as an env file.
@@ -38,6 +44,7 @@ To view the database file .db, please use https://inloop.github.io/sqlite-viewer
 - Deploy on Azure Logic Apps for fault tolerance and availability on cloud
 - Improved prompting - I did not find this necessary as it really depends on data qualtiy as well.
 - Include a means to login via Entra ID for Azure Logic Apps (Last step)
+
 
 
 

@@ -13,10 +13,11 @@
 Additional Guardrails -> Can be implemented via Azure Foundry on model deployment
 
 # Langchain Agent - Langgraph Workflow
-- Start at "agent" → model makes a decision.
-- If tools are needed → go to "tools".
-- After tool use → return to "agent" for further reasoning.
-- If no further action is needed → end the workflow
+This is a cyclical loop where the agent decides if/which tool should be used based on the query. It falls back to the agent if further steps are needed.
+- Start at "agent" and model makes a decision.
+- If tools are needed, go to "tools".
+- After tool use, return to "agent" for further reasoning.
+- If no further action is needed, end the workflow
 
 # Python Files
 There are four files used here.
@@ -44,6 +45,7 @@ To view the database file .db, please use https://inloop.github.io/sqlite-viewer
 - Deploy on Azure Logic Apps for fault tolerance and availability on cloud
 - Improved prompting - I did not find this necessary as it really depends on data qualtiy as well.
 - Include a means to login via Entra ID for Azure Logic Apps (Last step)
+
 
 
 

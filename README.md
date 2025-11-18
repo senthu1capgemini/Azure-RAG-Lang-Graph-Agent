@@ -40,11 +40,12 @@ To view the database file .db, please use https://inloop.github.io/sqlite-viewer
 - Include monitoring via LangFuse, LangSmith
 - Include guardrail implementation via Azure Foundry (This might include PII, toxicitiy, adulterated content, deepfakes, etc.) Include Azure Content Safety.
 - Continue model experimentation for LLMs and embeddings
-- Continue improvied indexing via skillsets, indexers, indexes on Azure Search for Retrieval Quality and Knowledge management
+- Continue improved indexing via skillsets, indexers, indexes on Azure Search for Retrieval Quality and Knowledge management
 - Include a frontened app via StreamLit or Gradio --or better React or Next
 - Deploy on Azure Logic Apps for fault tolerance and availability on cloud
-- Improved prompting - I did not find this necessary as it really depends on data qualtiy as well.
+- Improved prompting - I did not find this necessary as it really depends on data quality as well.
 - Include a means to login via Entra ID for Azure Logic Apps (Last step)
+
 
 
 

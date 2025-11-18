@@ -10,6 +10,12 @@
 - Persistent Memory : SQLite
 - Tools : Calculator, Summarizer, Rag Search, Web Search (Tavily)
 
+# Azure Resources used 
+- Azure Blob Storage - Store raw documents
+- Azure Search
+- Azure Foundry (LLM and embeddings)
+
+
 Additional Guardrails -> Can be implemented via Azure Foundry on model deployment
 
 # Langchain Agent - Langgraph Workflow
@@ -45,6 +51,7 @@ To view the database file .db, please use https://inloop.github.io/sqlite-viewer
 - Deploy on Azure Logic Apps for fault tolerance and availability on cloud
 - Improved prompting - I did not find this necessary as it really depends on data quality as well.
 - Include a means to login via Entra ID for Azure Logic Apps (Last step)
+
 
 
 

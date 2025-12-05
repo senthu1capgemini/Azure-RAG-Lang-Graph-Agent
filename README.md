@@ -35,11 +35,9 @@ There are four files used here.
 # How to use
 - Create the Azure components : Azure Search, Azure Foundry Emdeddings, and LLM via Forundry. Get the API details and save as an env file.
 - Run the main.py file
-  
-For Web Search, I use Tavily, you may need to set up an API access for it.
-
-To view the database file .db, please use https://inloop.github.io/sqlite-viewer/.
-
+- For Web Search, I use Tavily, you may need to set up an API access for it.
+- For monitoring, please use the http://localhost:6006/projects to view token usage and costs of each prompt and response. Additional annotations can be added.
+- To view the persistent memory database file .db, please use https://inloop.github.io/sqlite-viewer/.
 
 # Next Steps:
 - If necessary, change SQLITE to Azure CosmosDB
@@ -51,6 +49,7 @@ To view the database file .db, please use https://inloop.github.io/sqlite-viewer
 - Deploy on Azure Logic Apps for fault tolerance and availability on cloud
 - Improved prompting - I did not find this necessary as it really depends on data quality as well.
 - Include a means to login via Entra ID for Azure Logic Apps (Last step)
+
 
 
 

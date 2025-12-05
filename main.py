@@ -1,7 +1,10 @@
 import os
 import operator
 import sqlite3
-from dotenv import load_dotenv      
+import phoenix as px
+from dotenv import load_dotenv  
+from phoenix.otel import register       
+
 
 from typing import TypedDict, Annotated, Sequence
 from typing_extensions import TypedDict
@@ -17,10 +20,21 @@ from memory import get_session_history, clear_session_history, list_sessions
 from toolkit import calculate, summarize_text, search_knowledge_base, web_search
 from ragSearch import AzureSearchVector
 
+# Monitoring setup-------------------------------------------------------------------------------------------------------------------
+px.launch_app()
+
+tracer_provider = register(
+  project_name="default",
+  endpoint="http://localhost:6006/v1/traces",
+  auto_instrument=True
+)
+
+
+# Load environment variables--------------------------------------------------------------------------------------------------------------
 load_dotenv()
 SQLITE_DB_PATH ="chat_history.db"
 
-#Azure Components Initialization - LLM, Embeddings, Vector Store, Memory---------------------------------------------------------------------------
+#Azure Components Initialization - LLM, Embeddings, Vector Store, Memory-------------------------------------------------------------------
 # Initialize Azure OpenAI LLM
 llm = AzureChatOpenAI(
     azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT"),
@@ -39,6 +53,7 @@ embeddings = AzureOpenAIEmbeddings(
 )
 
 # Simple Azure Search wrapper that works directly with Azure SDK------------------------------------------------------------------------------------
+        
 # Initialize vector store
 vector_store = AzureSearchVector(
     index_name = os.getenv("AZURE_SEARCH_INDEX_NAME"),
@@ -62,31 +77,35 @@ tool_node = ToolNode(tools)
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], operator.add]
 
-#define LangGraph workflow nodes
+# Define LangGraph workflow nodes
 def call_model(state: AgentState):
-    "Calls the LLM to decide what to do next."
-    messages = state["messages"] 
-    #Bind tools to LLM
+    """Calls the LLM to decide what to do next."""
+    messages = state["messages"]
+    
+    # Bind tools to LLM
     llm_with_tools = llm.bind_tools(tools)
-    #get response
+    
+    # Get response
     response = llm_with_tools.invoke(messages)
     return {"messages": [response]}
-#routing logic
+
+# Simplified routing logic
 def should_continue(state: AgentState):
     "Determines if we should continue to tools or end."
     last_message = state["messages"][-1]
-    #LLM made a tool call check
+    
+    # Check if the LLM made a tool call
     if hasattr(last_message, "tool_calls") and last_message.tool_calls:
         return "tools"
     
     return "end"
 
-#Build LangGraph workflow
+# Build LangGraph workflow
 workflow = StateGraph(AgentState)
 workflow.add_node("agent", call_model)
-workflow.add_node("tools", tool_node)  #Single ToolNode handles all tools for this example
+workflow.add_node("tools", tool_node)  # Single ToolNode handles all tools
 
-#Set start point
+# Set entry point
 workflow.set_entry_point("agent")
 workflow.add_conditional_edges("agent", should_continue,
     { 
@@ -95,8 +114,9 @@ workflow.add_conditional_edges("agent", should_continue,
     }
 )
 workflow.add_edge("tools", "agent")
-app = workflow.compile() # Compile the graph for execution of workflow
 
+# Compile the graph
+app = workflow.compile()
 # Main execution function of agent with memory------------------------------------------------------------------------------------------------------
 def run_agent(user_input: str, session_id: str = "defaultUser"):
     # Get conversation history
@@ -119,25 +139,26 @@ def run_agent(user_input: str, session_id: str = "defaultUser"):
     
     return str(final_message)
 
-# ========================================================================================================================================================
-# INTERACTIVE CLI UI
-# ========================================================================================================================================================
+# ====================================================================================================================================================================================================
+# INTERACTIVE CLI INTERFACE
+# ====================================================================================================================================================================================================
+
 def interactive_cli():
     "Main interactive CLI loop."
     print("\n" + "="*100)
     print("   INTERACTIVE AGENT CLI")
     print("="*100)
     print("\nCommands:")
-    print("- Type your query and press Enter to talk to the agent")
-    print("- 'status' - Show agent status")
-    print("- 'clear' - Clear current session history")
-    print("- 'sessions' - List all available sessions")
-    print("- 'session <name>' - Switch to a different session")
+    print("  - Type your query and press Enter to talk to the agent")
+    print("  - 'status' - Show agent status")
+    print("  - 'clear' - Clear current session history")
+    print("  - 'sessions' - List all available sessions")
+    print("  - 'session <name>' - Switch to a different session")
     print("\nAvailable Tools:")
-    print("- calculate(expression) - Perform math calculations")
-    print("- summarize_text(text) - Summarize long text")
-    print("- search knowledge base(query) - Search the knowledge base")
-    print("- web search(query) - Search the web via Tavily")
+    print("  - calculate(expression) - Perform math calculations")
+    print("  - summarize_text(text) - Summarize long text")
+    print("  - search knowledge base(query) - Search the knowledge base")
+    print("  - web search(query) - Search the web via Tavily")
     print("\n" + "="*100 + "\n")
 
     print("Enter your username to start:")
@@ -147,9 +168,13 @@ def interactive_cli():
 
     while True:
         try:
+            # Get user input
             user_input = input(f"\n[{current_session}] You: ").strip()
+            
+            # Handle empty input
             if not user_input:
                 continue    
+            # Handle commands
             if user_input.lower() in ['quit', 'exit', 'q']:
                 print("\n Goodbye! Your are on your own now!\n")
                 break          
@@ -179,6 +204,7 @@ def interactive_cli():
         except KeyboardInterrupt:
             print("\n\n Interrupted. Goodbye! Stupid of me or beyond my control!\n")
             break
+        
         except Exception as e:
             print(f"\n Error: {e}\n")
 

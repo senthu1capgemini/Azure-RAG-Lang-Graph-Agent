@@ -29,7 +29,6 @@ tracer_provider = register(
   auto_instrument=True
 )
 
-
 # Load environment variables--------------------------------------------------------------------------------------------------------------
 load_dotenv()
 SQLITE_DB_PATH ="chat_history.db"
@@ -53,7 +52,6 @@ embeddings = AzureOpenAIEmbeddings(
 )
 
 # Simple Azure Search wrapper that works directly with Azure SDK------------------------------------------------------------------------------------
-        
 # Initialize vector store
 vector_store = AzureSearchVector(
     index_name = os.getenv("AZURE_SEARCH_INDEX_NAME"),
@@ -66,10 +64,8 @@ vector_store = AzureSearchVector(
 
 # SQLite-based chat history management-----------------------------------------------------------------------------------------------------------------
 chat_histories = {}
-
 # Create tools list
 tools = [calculate, summarize_text, search_knowledge_base, web_search]
-
 # Create ToolNode - this replaces ToolExecutor and individual tool nodes
 tool_node = ToolNode(tools)
 
@@ -79,7 +75,7 @@ class AgentState(TypedDict):
 
 # Define LangGraph workflow nodes
 def call_model(state: AgentState):
-    """Calls the LLM to decide what to do next."""
+    # Calls the LLM to decide what to do next
     messages = state["messages"]
     
     # Bind tools to LLM
@@ -91,7 +87,7 @@ def call_model(state: AgentState):
 
 # Simplified routing logic
 def should_continue(state: AgentState):
-    "Determines if we should continue to tools or end."
+    # Determines if we should continue to tools or end
     last_message = state["messages"][-1]
     
     # Check if the LLM made a tool call
@@ -144,8 +140,7 @@ def run_agent(user_input: str, session_id: str = "defaultUser"):
 # ====================================================================================================================================================================================================
 
 def interactive_cli():
-    "Main interactive CLI loop."
-    print("\n" + "="*100)
+    # Main interactive CLI loop
     print("   INTERACTIVE AGENT CLI")
     print("="*100)
     print("\nCommands:")

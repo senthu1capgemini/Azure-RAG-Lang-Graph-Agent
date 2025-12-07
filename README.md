@@ -3,6 +3,47 @@
 - This repository provides a template to create a simple Azure Langchain Langgraph agent workflow that is capable of performing RAG search, web search, summarization, and calculation.
 - This repository was created via uv and all dependancies can be found on the pyproject.toml file.
 
+# Functional Architecture
+                ┌───────────────────────────┐
+                │        User Query         │
+                └─────────────┬─────────────┘
+                              │
+                              ▼
+                ┌───────────────────────────┐
+                │        LLM Layer          │
+                │  - Azure Chat OpenAI      │
+                └─────────────┬─────────────┘
+                              │
+          ┌───────────────────────┼──────────────────────────────┐
+          │                       │                              │
+          ▼                       ▼                              ▼
+          ┌───────────────────┐ ┌──────────────────┐ ┌───────────────────┐
+          │ OpenAI ADA        │ │ Persistent Memory│ │ Tools             │
+          │ Embeddings        │ │ SQLite (Local)   │ │ - Calculator      │
+          └─────────┬─────────┘ └────────┬─────────┘ │ - Summarizer      │
+                    │                    │           │ - Rag Search      │
+                    ▼                    │           │ - Web Search      │
+         ┌───────────────────┐           │           │   (Tavily)        │
+         │ Azure AI Search   │           │           └───────────────────┘
+         └─────────┬─────────┘           │
+                   │                     │
+                   └──────────┬──────────┘
+                              │
+                              ▼
+                ┌───────────────────────────┐
+                │   Response Generation     │
+                └─────────────┬─────────────┘
+                              │
+                              ▼
+                ┌───────────────────────────┐
+                │ Monitoring: Arize Phoenix │
+                │ (Local Setup)             │
+                └───────────────────────────┘
+
+
+
+
+
 # Components
 - LLM : Azure Foundry OpenAI GPT4o
 - Embeddings model : Azure Foundry OpenAI Embedding model
@@ -41,6 +82,7 @@ There are four files used here.
 
 # Next Steps:
 - If necessary, change SQLITE to Azure CosmosDB
+- Include Structured RAG (pgvector), or GraphRAG
 - Include monitoring via LangFuse, LangSmith
 - Include guardrail implementation via Azure Foundry (This might include PII, toxicitiy, adulterated content, deepfakes, etc.) Include Azure Content Safety.
 - Continue model experimentation for LLMs and embeddings
@@ -49,6 +91,7 @@ There are four files used here.
 - Deploy on Azure Logic Apps for fault tolerance and availability on cloud
 - Improved prompting - I did not find this necessary as it really depends on data quality as well.
 - Include a means to login via Entra ID for Azure Logic Apps (Last step)
+
 
 
 

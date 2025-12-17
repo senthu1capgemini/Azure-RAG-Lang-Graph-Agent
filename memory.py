@@ -5,14 +5,14 @@ from langchain_community.chat_message_histories import SQLChatMessageHistory
 SQLITE_DB_PATH ="chat_history.db"
 
 def get_session_history(session_id: str) -> SQLChatMessageHistory:
-    "Get SQLite chat history for a session."
+    # Get SQLite chat history for a session
     return SQLChatMessageHistory(
         session_id=session_id,
         connection=f"sqlite:///{SQLITE_DB_PATH}"
     )
 
 def clear_session_history(session_id: str = None):
-    "Clear chat history for a specific session or all sessions."
+    # Clear chat history for a specific session or all sessions.
     try:
         conn = sqlite3.connect(SQLITE_DB_PATH)
         cursor = conn.cursor() # Needed to execute the SQL commands
@@ -37,7 +37,7 @@ def clear_session_history(session_id: str = None):
         return f"Error clearing history: {str(e)}"
 
 def list_sessions():
-    "List all available sessions in the database."
+    # List all available sessions in the database.
     try:
         conn = sqlite3.connect(SQLITE_DB_PATH)
         cursor = conn.cursor()
@@ -62,3 +62,4 @@ def list_sessions():
         
     except Exception as e:
         return f"Error listing sessions: {str(e)}"
+

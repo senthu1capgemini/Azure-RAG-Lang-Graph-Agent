@@ -36,7 +36,7 @@ vector_store = AzureSearchVector(
 #  Define Tools - Mathematical Calculation, Text Summarization, Knowledge Base Search, Web Search------------------------------------------------------------------------------
 @tool
 def calculate(expression: str) -> str:
-    # Performs mathematical calculations. Input should be a valid Python math expression
+    "Performs mathematical calculations. Input should be a valid Python math expression"
     try:
         result = eval(expression, {"__builtins__": {}}, {})
         return f"Result: {result}"
@@ -45,14 +45,14 @@ def calculate(expression: str) -> str:
 
 @tool
 def summarize_text(text: str) -> str:
-    # Summarizes the given text using the LLM
+    "Summarizes the given text using the LLM"
     prompt = f"Please provide a concise summary of the following text:\n\n{text}"
     response = llm.invoke(prompt)
     return response.content
 
 @tool
 def search_knowledge_base(query: str) -> str:
-    # Searches the Azure AI Search vector database for relevant information.
+    "Searches the Azure AI Search vector database for relevant information."
     results = vector_store.similarity_search(query, k=3)
     if not results:
         return "No relevant information found in the knowledge base."
@@ -62,7 +62,7 @@ def search_knowledge_base(query: str) -> str:
 
 @tool
 def web_search(query: str,  num_results: int = 3) -> str:
-    # Searches the web using tavily search and provides upto 5 results.
+    "Searches the web using tavily search and provides upto 5 results."
     try:
         api_key = os.getenv("TAVILY_API_KEY")
         tavily_client = TavilyClient(api_key)
@@ -76,5 +76,6 @@ def web_search(query: str,  num_results: int = 3) -> str:
         return response['results']
     except ValueError as e:
         print(f"{e}")
+
 
 
